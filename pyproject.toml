@@ -25,6 +25,9 @@ explicit = true
 torch = { index = "pytorch-cu121" }
 torchvision = { index = "pytorch-cu121" }
 
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
