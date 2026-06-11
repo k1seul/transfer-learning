@@ -33,9 +33,9 @@ from src.shot import run_shot_adaptation
 # ── Defaults ──────────────────────────────────────────────────────────────────
 
 DEFAULTS = {
-    # paths
-    'cub_path':       './CUB_200_2011/images',
-    'paintings_path': './CUB_200_Paintings',
+    # paths (override with --data-dir or per-config fields)
+    'cub_path':       './data/CUB_200_2011/images',
+    'paintings_path': './data/CUB_200_Paintings',
     'ckpt_dir':       './checkpoints',
     # model
     'proj_dim': 128,
