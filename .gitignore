@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.pth
+*.pt
+*.npy
+wandb/
+.env
+checkpoints/
+results/
+*.log
+.python-version
+.venv/
+*.egg-info/
+dist/

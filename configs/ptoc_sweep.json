@@ -1,0 +1,78 @@
+[
+  {
+    "name": "shot_baseline",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "none",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "shot_lr": 1e-3, "shot_rounds": 5, "shot_epochs": 15
+  },
+  {
+    "name": "shot_heavy_aug",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "shot_lr": 1e-3, "shot_rounds": 5, "shot_epochs": 15
+  },
+  {
+    "name": "shot_heavy_low_lr",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "shot_lr": 1e-4, "shot_rounds": 5, "shot_epochs": 15
+  },
+  {
+    "name": "shot_heavy_adamw",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "heavy",
+    "optimizer": "adamw", "lr": 1e-3, "weight_decay": 1e-2,
+    "src_epochs": 80,
+    "shot_lr": 1e-3, "shot_rounds": 5, "shot_epochs": 15
+  },
+  {
+    "name": "jp_conservative",
+    "setting": "PtoC",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "pseudo_warmup": 50, "pseudo_rounds": 2, "pseudo_round_epochs": 10,
+    "pseudo_threshold": 0.95, "lambda_nce": 0.05,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "jp_moderate",
+    "setting": "PtoC",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "pseudo_warmup": 50, "pseudo_rounds": 3, "pseudo_round_epochs": 10,
+    "pseudo_threshold": 0.9, "lambda_nce": 0.05,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "jp_mixup_smooth",
+    "setting": "PtoC",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "pseudo_warmup": 50, "pseudo_rounds": 2, "pseudo_round_epochs": 10,
+    "pseudo_threshold": 0.95, "lambda_nce": 0.05,
+    "mixup_alpha": 0.2, "label_smoothing": 0.1,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "shot_long_src",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 120,
+    "shot_lr": 1e-3, "shot_rounds": 5, "shot_epochs": 20
+  }
+]

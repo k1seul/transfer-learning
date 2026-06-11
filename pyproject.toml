@@ -1,0 +1,30 @@
+[project]
+name = "uda-search"
+version = "0.1.0"
+description = "UDA hyperparameter search: CUB-200 <-> CUB-200-Paintings"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1",
+    "torchvision>=0.16",
+    "wandb>=0.16",
+    "tqdm>=4.65",
+    "info-nce-pytorch>=0.1",
+    "numpy>=1.24",
+]
+
+[tool.uv]
+dev-dependencies = ["ipython", "matplotlib"]
+
+# PyTorch with CUDA 12.1 (RTX 3090 compatible)
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchvision = { index = "pytorch-cu121" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

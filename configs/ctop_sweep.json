@@ -1,0 +1,123 @@
+[
+  {
+    "name": "baseline",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "none",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "light_aug",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_aug",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_aug_adamw",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "adamw", "lr": 1e-3, "weight_decay": 1e-2,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_aug_adamw_low",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "adamw", "lr": 3e-4, "weight_decay": 5e-2,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_nce_low",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.01, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_thr_high",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.9, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_mixup",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "mixup_alpha": 0.2,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_smooth",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "label_smoothing": 0.1,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_em",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "lambda_em": 0.1,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_shot_long",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 5, "shot_epochs": 20
+  },
+  {
+    "name": "heavy_shot_lr_high",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-3, "shot_rounds": 5, "shot_epochs": 15
+  },
+  {
+    "name": "heavy_best_combo",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "heavy",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "mixup_alpha": 0.2, "label_smoothing": 0.1, "lambda_em": 0.05,
+    "shot_lr": 1e-4, "shot_rounds": 5, "shot_epochs": 20
+  }
+]
