@@ -33,20 +33,42 @@ def evaluate(model, loader, device):
 
 
 @torch.no_grad()
-def generate_pseudo_labels(model, root, transform, device, threshold, batch_size, num_workers):
+def generate_pseudo_labels(model, root, transform, device, threshold, batch_size, num_workers,
+                           select_mode='threshold', top_k=15, num_classes=200):
     model.eval()
     ds     = ImageFolder(root=root, transform=transform)
     loader = make_loader(ds, batch_size, shuffle=False, num_workers=num_workers)
-    indices, labels = [], []
-    offset = 0
+
+    all_probs = []
     for imgs, _ in loader:
-        probs          = F.softmax(model(imgs.to(device)), dim=1)
-        max_prob, pred = probs.max(1)
-        mask           = (max_prob >= threshold).nonzero(as_tuple=True)[0]
-        for j in mask:
-            indices.append(offset + j.item())
-            labels.append(pred[j].item())
-        offset += len(imgs)
+        feat = model.encode(imgs.to(device))
+        p1   = F.softmax(model.classifier(feat), dim=1)
+        # Ensemble two classifiers if available (better pseudo quality)
+        if getattr(model, 'classifier2', None) is not None:
+            p2 = F.softmax(model.classifier2(feat), dim=1)
+            all_probs.append(((p1 + p2) / 2).cpu())
+        else:
+            all_probs.append(p1.cpu())
+    all_probs = torch.cat(all_probs)          # (N, C)
+    max_prob, all_preds = all_probs.max(1)
+
+    if select_mode == 'balanced':
+        # per-class top-k by confidence → equal class coverage
+        indices, labels = [], []
+        for c in range(num_classes):
+            cls_idx = (all_preds == c).nonzero(as_tuple=True)[0]
+            if len(cls_idx) == 0:
+                continue
+            k = min(top_k, len(cls_idx))
+            top_local = max_prob[cls_idx].topk(k).indices
+            for j in top_local:
+                indices.append(cls_idx[j].item())
+                labels.append(c)
+    else:
+        mask    = (max_prob >= threshold).nonzero(as_tuple=True)[0]
+        indices = mask.tolist()
+        labels  = all_preds[mask].tolist()
+
     return indices, labels
 
 
@@ -87,27 +109,39 @@ def train_joint_epoch(model, src_loader, tgt_loader, optimizer, criterion,
 
     for src_imgs, src_lbls in tqdm(src_loader, desc="[Joint]", leave=False):
         src_imgs, src_lbls = src_imgs.to(device), src_lbls.to(device)
-        tgt_imgs = next(tgt_iter).to(device)
+        tgt_batch = next(tgt_iter)
         optimizer.zero_grad()
+
+        # Two-view NCE (TwoViewDataset) or fallback to noise augmentation
+        if isinstance(tgt_batch, (list, tuple)):
+            tgt_v1, tgt_v2 = tgt_batch[0].to(device), tgt_batch[1].to(device)
+        else:
+            tgt_v1 = tgt_batch.to(device)
+            tgt_v2 = tgt_v1 + torch.randn_like(tgt_v1) * noise_std
 
         if mixup_alpha > 0:
             mixed, y_a, y_b, lam = mixup_data(src_imgs, src_lbls, mixup_alpha)
-            src_out = model(mixed)
+            feat_m  = model.encode(mixed)
+            src_out = model.classifier(feat_m)
             ce_loss = lam * criterion(src_out, y_a) + (1 - lam) * criterion(src_out, y_b)
+            if getattr(model, 'classifier2', None) is not None:
+                src_out2 = model.classifier2(feat_m)
+                ce_loss  = ce_loss + lam * criterion(src_out2, y_a) + (1 - lam) * criterion(src_out2, y_b)
             with torch.no_grad():
                 acc_sum += model(src_imgs).argmax(1).eq(src_lbls).float().mean().item()
         else:
-            src_out = model(src_imgs)
+            feat    = model.encode(src_imgs)
+            src_out = model.classifier(feat)
             ce_loss = criterion(src_out, src_lbls)
+            if getattr(model, 'classifier2', None) is not None:
+                ce_loss = ce_loss + criterion(model.classifier2(feat), src_lbls)
             acc_sum += src_out.detach().argmax(1).eq(src_lbls).float().mean().item()
 
-        nce_loss = info_nce(feat_fn(tgt_imgs),
-                            feat_fn(tgt_imgs + torch.randn_like(tgt_imgs) * noise_std),
-                            temperature=temperature)
+        nce_loss = info_nce(feat_fn(tgt_v1), feat_fn(tgt_v2), temperature=temperature)
 
         em_loss = torch.tensor(0.0, device=device)
         if lambda_em > 0:
-            p = F.softmax(model(tgt_imgs), dim=1)
+            p = F.softmax(model(tgt_v1), dim=1)
             em_loss = -(p * p.log()).sum(1).mean()
 
         (ce_loss + lambda_nce * nce_loss + lambda_em * em_loss).backward()

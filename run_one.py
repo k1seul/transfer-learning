@@ -18,7 +18,8 @@ import wandb
 from torchvision.datasets import ImageFolder
 
 from src.data import (
-    get_transform, UnlabeledDataset, PseudoLabeledDataset,
+    get_transform, get_contrastive_transform,
+    UnlabeledDataset, TwoViewDataset, PseudoLabeledDataset,
     make_loader, set_seed,
 )
 from src.models import ResNetUDA
@@ -28,6 +29,10 @@ from src.training import (
     build_optimizer, build_scheduler,
 )
 from src.shot import run_shot_adaptation
+from src.dann import run_dann
+from src.mcd  import run_mcd
+from src.ssl  import run_ssl_pretrain
+from src.models import DomainDiscriminator
 
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
@@ -50,6 +55,12 @@ DEFAULTS = {
     'seed':         42,
     # augmentation
     'aug_mode': 'none',
+    'use_contrastive_aug': False,   # SimCLR-style two-view NCE
+    # model
+    'two_classifier': False,        # add second classifier for regularization
+    # pseudo-label selection
+    'pseudo_select': 'threshold',   # 'threshold' | 'balanced'
+    'pseudo_top_k':  15,            # per-class top-k for balanced mode
     # joint_pseudo warmup
     'pseudo_warmup':       30,
     'pseudo_rounds':        3,
@@ -62,16 +73,26 @@ DEFAULTS = {
     'mixup_alpha':        0.0,
     'label_smoothing':    0.0,
     # SHOT
-    'shot_lr':       1e-4,
-    'shot_rounds':      3,
-    'shot_epochs':     15,
-    'lambda_im':      1.0,
-    'lambda_pseudo':  1.0,
+    'shot_lr':         1e-4,
+    'shot_rounds':        3,
+    'shot_epochs':       15,
+    'lambda_im':        1.0,
+    'lambda_pseudo':    1.0,
+    'lambda_src_shot':  0.0,   # source-replay weight during SHOT (0 = disabled)
     # pipeline
-    'mode':       'joint_pseudo_then_shot',  # joint_pseudo | shot_only | joint_pseudo_then_shot
-    'src_epochs':  80,                        # used by shot_only (no pseudo rounds)
+    'mode':       'joint_pseudo_then_shot',
+    # modes: source_only | shot_only | joint_pseudo | joint_pseudo_then_shot | dann | mcd
+    'src_epochs':  80,
+    # DANN
+    'lambda_dann': 1.0,
+    # MCD
+    'mcd_k': 4,   # Step-C repetitions per iteration
+    # Color-gap augmentation (PtoC: paintings ~51.5% grayscale, photos always color)
+    'tgt_gray_p': 0.0,   # P(RandomGrayscale) on target during training & SHOT
+    'src_gray_p': 0.0,   # P(RandomGrayscale) on source during training
     # wandb
     'wandb_project': 'uda-cub',
+    'wandb_entity':  'hanseul',
     '_global_step':  0,
 }
 
@@ -86,10 +107,25 @@ def load_config(config_path: str, idx: int) -> dict:
     return cfg
 
 
+# ── Best checkpoint saver ─────────────────────────────────────────────────────
+
+class BestSaver:
+    """Saves model state_dict whenever a new best target accuracy is achieved."""
+    def __init__(self, path):
+        self.path = path
+        self.best = 0.0
+
+    def update(self, model, acc):
+        if acc > self.best:
+            self.best = acc
+            torch.save(model.state_dict(), self.path)
+
+
 # ── Training pipeline ─────────────────────────────────────────────────────────
 
 def run_joint_pseudo(model, cfg, device, src_loader, src_eval_loader,
-                     tgt_loader, tgt_root, tgt_tf, eval_loader, wandb_run):
+                     tgt_loader, tgt_root, tgt_tf, eval_loader, wandb_run,
+                     best_saver=None):
     """
     Warmup (joint CE+NCE) + pseudo-labeling rounds.
     Returns best target accuracy seen during training.
@@ -110,6 +146,8 @@ def run_joint_pseudo(model, cfg, device, src_loader, src_eval_loader,
         src_acc = evaluate(model, src_eval_loader, device)
         tgt_acc = evaluate(model, eval_loader, device)
         best_tgt = max(best_tgt, tgt_acc)
+        if best_saver:
+            best_saver.update(model, tgt_acc)
         step += 1
 
         print(f"  Warmup {epoch+1}/{cfg['pseudo_warmup']}"
@@ -130,7 +168,9 @@ def run_joint_pseudo(model, cfg, device, src_loader, src_eval_loader,
     for rnd in range(1, cfg['pseudo_rounds'] + 1):
         indices, pseudo_labels = generate_pseudo_labels(
             model, tgt_root, tgt_tf, device,
-            cfg['pseudo_threshold'], cfg['batch_size'], cfg['num_workers'])
+            cfg['pseudo_threshold'], cfg['batch_size'], cfg['num_workers'],
+            select_mode=cfg.get('pseudo_select', 'threshold'),
+            top_k=cfg.get('pseudo_top_k', 15))
         n_pseudo = len(indices)
         pct      = 100 * n_pseudo / len(eval_loader.dataset)
         print(f"\n  [Round {rnd}/{cfg['pseudo_rounds']}]"
@@ -157,6 +197,8 @@ def run_joint_pseudo(model, cfg, device, src_loader, src_eval_loader,
             src_acc = evaluate(model, src_eval_loader, device)
             tgt_acc = evaluate(model, eval_loader, device)
             best_tgt = max(best_tgt, tgt_acc)
+            if best_saver:
+                best_saver.update(model, tgt_acc)
             step += 1
 
             print(f"  R{rnd} ep{epoch+1}/{cfg['pseudo_round_epochs']}"
@@ -224,6 +266,7 @@ def main():
     # ── wandb init ────────────────────────────────────────────
     run = wandb.init(
         project=cfg.get('wandb_project', 'uda-cub'),
+        entity=cfg.get('wandb_entity', 'k1seul_snu'),
         name=f"{cfg['setting']}_{cfg.get('name', f'idx_{args.idx}')}",
         config={k: v for k, v in cfg.items() if not k.startswith('_')},
         tags=[cfg['setting'], cfg.get('mode', 'joint_pseudo')],
@@ -238,41 +281,74 @@ def main():
 
     _heavy   = cfg['aug_mode'] == 'heavy'
     _augment = cfg['aug_mode'] in ('light', 'heavy')
-    src_tf      = get_transform(src_domain, augment=_augment, heavy=_heavy)
+
+    # tgt_gray_p: for PtoC, randomly grayscale CUB photos during training to match
+    # the paintings source (~51.5% grayscale). Applied only to tgt_loader and SHOT,
+    # NOT to eval_loader or generate_pseudo_labels (those use clean tgt_tf).
+    tgt_gray_p   = cfg.get('tgt_gray_p', 0.0)
+    src_gray_p   = cfg.get('src_gray_p', 0.0)
+
+    src_tf       = get_transform(src_domain, augment=_augment, heavy=_heavy, grayscale_p=src_gray_p)
     src_clean_tf = get_transform(src_domain)
-    tgt_tf      = get_transform(tgt_domain)
+    tgt_tf       = get_transform(tgt_domain)                             # clean — eval & pseudo gen
+    tgt_train_tf = get_transform(tgt_domain, grayscale_p=tgt_gray_p)    # training only
 
     from torchvision.datasets import ImageFolder
     source_ds    = ImageFolder(root=src_root, transform=src_tf)
     src_eval_ds  = ImageFolder(root=src_root, transform=src_clean_tf)
     eval_ds      = ImageFolder(root=tgt_root, transform=tgt_tf)
-    tgt_unl_ds   = UnlabeledDataset(ImageFolder(root=tgt_root, transform=tgt_tf))
+    tgt_unl_ds   = UnlabeledDataset(ImageFolder(root=tgt_root, transform=tgt_train_tf))
 
     src_loader      = make_loader(source_ds,   cfg['batch_size'], shuffle=True,  num_workers=cfg['num_workers'])
     src_eval_loader = make_loader(src_eval_ds, cfg['batch_size'], shuffle=False, num_workers=cfg['num_workers'])
     eval_loader     = make_loader(eval_ds,     cfg['batch_size'], shuffle=False, num_workers=cfg['num_workers'])
-    tgt_loader      = make_loader(tgt_unl_ds,  cfg['batch_size'], shuffle=True,  num_workers=cfg['num_workers'])
+
+    if cfg.get('use_contrastive_aug', False):
+        nce_tf     = get_contrastive_transform(tgt_domain)
+        tgt_nce_ds = TwoViewDataset(tgt_root, nce_tf)
+        tgt_loader = make_loader(tgt_nce_ds, cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'])
+    else:
+        tgt_loader = make_loader(tgt_unl_ds, cfg['batch_size'], shuffle=True, num_workers=cfg['num_workers'])
 
     # ── Model ─────────────────────────────────────────────────
-    model = ResNetUDA(num_classes=200, proj_dim=cfg['proj_dim']).to(device)
+    mode  = cfg.get('mode', 'joint_pseudo_then_shot')
+    model = ResNetUDA(
+        num_classes=200,
+        proj_dim=cfg['proj_dim'],
+        two_classifier=(mode == 'mcd' or cfg.get('two_classifier', False)),
+    ).to(device)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Params  : {n_params/1e6:.2f}M\n")
 
     best_tgt = 0.0
 
-    # ── Run pipeline ──────────────────────────────────────────
-    mode = cfg.get('mode', 'joint_pseudo_then_shot')
+    # ── Best checkpoint saver (seed-aware) ────────────────────
+    os.makedirs(cfg['ckpt_dir'], exist_ok=True)
+    seed = cfg.get('seed', 42)
+    ckpt_name = f"{setting}_{cfg.get('name', f'idx_{args.idx}')}_seed{seed}_best.pth"
+    ckpt_path = os.path.join(cfg['ckpt_dir'], ckpt_name)
+    best_saver = BestSaver(ckpt_path)
 
-    if mode in ('joint_pseudo', 'joint_pseudo_then_shot'):
+    # ── Run pipeline ──────────────────────────────────────────
+    if mode == 'source_only':
+        print("=" * 60)
+        print("  Source-only Training (no adaptation)")
+        print("=" * 60)
+        best_tgt = run_shot_only(
+            model, cfg, device,
+            src_loader, src_eval_loader, tgt_root, tgt_tf, eval_loader, run)
+
+    elif mode in ('joint_pseudo', 'joint_pseudo_then_shot'):
         print("=" * 60)
         print("  Phase 1: Joint Pseudo Training")
         print("=" * 60)
         best_tgt = run_joint_pseudo(
             model, cfg, device,
             src_loader, src_eval_loader, tgt_loader,
-            tgt_root, tgt_tf, eval_loader, run)
+            tgt_root, tgt_tf, eval_loader, run,
+            best_saver=best_saver)
 
-    elif mode in ('shot_only',):
+    elif mode == 'shot_only':
         print("=" * 60)
         print("  Phase 1: Source-only Training")
         print("=" * 60)
@@ -280,13 +356,45 @@ def main():
             model, cfg, device,
             src_loader, src_eval_loader, tgt_root, tgt_tf, eval_loader, run)
 
-    if mode in ('shot_only', 'joint_pseudo_then_shot'):
+    elif mode == 'ssl_then_shot':
+        print("=" * 60)
+        print("  Phase 0: SSL Pre-training on CUB (Target Domain)")
+        print("=" * 60)
+        run_ssl_pretrain(model, tgt_root, cfg, device, run)
+
+        print("=" * 60)
+        print("  Phase 1: Source Training on Paintings")
+        print("=" * 60)
+        best_tgt = run_shot_only(
+            model, cfg, device,
+            src_loader, src_eval_loader, tgt_root, tgt_tf, eval_loader, run)
+
+    elif mode == 'dann':
+        print("=" * 60)
+        print("  DANN Training")
+        print("=" * 60)
+        discriminator = DomainDiscriminator(in_dim=512).to(device)
+        best_tgt = run_dann(
+            model, discriminator, cfg, device,
+            src_loader, src_eval_loader, tgt_loader, eval_loader, run)
+
+    elif mode == 'mcd':
+        print("=" * 60)
+        print("  MCD Training")
+        print("=" * 60)
+        best_tgt = run_mcd(
+            model, cfg, device,
+            src_loader, src_eval_loader, tgt_loader, eval_loader, run)
+
+    if mode in ('shot_only', 'joint_pseudo_then_shot', 'ssl_then_shot'):
         print("\n" + "=" * 60)
         print("  Phase 2: SHOT Adaptation")
         print("=" * 60)
         shot_best = run_shot_adaptation(
-            model, tgt_root, tgt_tf, eval_loader, src_eval_loader,
-            cfg, device, wandb_run=run)
+            model, tgt_root, tgt_train_tf, eval_loader, src_eval_loader,
+            cfg, device, wandb_run=run,
+            src_loader=src_loader if cfg.get('lambda_src_shot', 0.0) > 0 else None,
+            best_saver=best_saver)
         best_tgt = max(best_tgt, shot_best)
 
     # ── Final eval & save ─────────────────────────────────────
@@ -295,10 +403,11 @@ def main():
     run.summary['final_tgt_acc'] = final_tgt
     print(f"\n  best_tgt={best_tgt:.2f}%  final_tgt={final_tgt:.2f}%")
 
-    os.makedirs(cfg['ckpt_dir'], exist_ok=True)
-    ckpt_name = f"{setting}_{cfg.get('name', f'idx_{args.idx}')}.pth"
-    torch.save(model.state_dict(), os.path.join(cfg['ckpt_dir'], ckpt_name))
-    print(f"  Checkpoint → {cfg['ckpt_dir']}/{ckpt_name}")
+    # best_saver가 이미 peak 시점 weights를 저장함.
+    # best가 0이면 (저장 안 된 경우) final model을 저장.
+    if best_saver.best == 0.0:
+        torch.save(model.state_dict(), ckpt_path)
+    print(f"  Best checkpoint (acc={best_saver.best:.2f}%) → {ckpt_path}")
 
     wandb.finish()
 

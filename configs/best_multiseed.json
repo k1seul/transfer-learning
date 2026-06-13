@@ -1,0 +1,90 @@
+[
+  {
+    "name": "ctop_best_seed42",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "label_smoothing": 0.05,
+    "pseudo_threshold": 0.7, "pseudo_rounds": 7, "pseudo_round_epochs": 10,
+    "pseudo_warmup": 30,
+    "shot_lr": 5e-4, "shot_rounds": 5, "shot_epochs": 20,
+    "seed": 42
+  },
+  {
+    "name": "ctop_best_seed123",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "label_smoothing": 0.05,
+    "pseudo_threshold": 0.7, "pseudo_rounds": 7, "pseudo_round_epochs": 10,
+    "pseudo_warmup": 30,
+    "shot_lr": 5e-4, "shot_rounds": 5, "shot_epochs": 20,
+    "seed": 123
+  },
+  {
+    "name": "ctop_best_seed456",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "label_smoothing": 0.05,
+    "pseudo_threshold": 0.7, "pseudo_rounds": 7, "pseudo_round_epochs": 10,
+    "pseudo_warmup": 30,
+    "shot_lr": 5e-4, "shot_rounds": 5, "shot_epochs": 20,
+    "seed": 456
+  },
+  {
+    "name": "ctop_best_seed789",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "label_smoothing": 0.05,
+    "pseudo_threshold": 0.7, "pseudo_rounds": 7, "pseudo_round_epochs": 10,
+    "pseudo_warmup": 30,
+    "shot_lr": 5e-4, "shot_rounds": 5, "shot_epochs": 20,
+    "seed": 789
+  },
+  {
+    "name": "ptoc_best_seed42",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15,
+    "seed": 42
+  },
+  {
+    "name": "ptoc_best_seed123",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15,
+    "seed": 123
+  },
+  {
+    "name": "ptoc_best_seed456",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15,
+    "seed": 456
+  },
+  {
+    "name": "ptoc_best_seed789",
+    "setting": "PtoC",
+    "mode": "shot_only",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15,
+    "seed": 789
+  }
+]

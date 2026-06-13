@@ -1,6 +1,32 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.autograd as autograd
+
+
+class GRL(autograd.Function):
+    """Gradient Reversal Layer (Ganin et al., ICML 2016)."""
+    @staticmethod
+    def forward(ctx, x, alpha):
+        ctx.alpha = alpha
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad):
+        return grad.neg() * ctx.alpha, None
+
+
+class DomainDiscriminator(nn.Module):
+    def __init__(self, in_dim=512, hidden=1024):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, hidden), nn.ReLU(), nn.Dropout(0.5),
+            nn.Linear(hidden, hidden), nn.ReLU(), nn.Dropout(0.5),
+            nn.Linear(hidden, 1),
+        )
+
+    def forward(self, feat, alpha=1.0):
+        return self.net(GRL.apply(feat, alpha)).squeeze(1)
 
 
 class SEBlock(nn.Module):
@@ -41,7 +67,7 @@ class ResBlock(nn.Module):
 
 class ResNetUDA(nn.Module):
     """ResNet-18-scale with GroupNorm, SE blocks, projection + classifier heads."""
-    def __init__(self, num_classes=200, proj_dim=128, groups=32):
+    def __init__(self, num_classes=200, proj_dim=128, groups=32, two_classifier=False):
         super().__init__()
         g = lambda c: min(groups, c)
         self.stem = nn.Sequential(
@@ -56,7 +82,8 @@ class ResNetUDA(nn.Module):
         self.pool   = nn.AdaptiveAvgPool2d(1)
         self.projector  = nn.Sequential(
             nn.Linear(512, 512), nn.ReLU(), nn.Linear(512, proj_dim))
-        self.classifier = nn.Linear(512, num_classes)
+        self.classifier  = nn.Linear(512, num_classes)
+        self.classifier2 = nn.Linear(512, num_classes) if two_classifier else None
 
     @staticmethod
     def _make_layer(in_ch, out_ch, n, stride, groups):
@@ -76,3 +103,14 @@ class ResNetUDA(nn.Module):
 
     def project(self, x):
         return self.projector(self.encode(x))
+
+    def feat_parameters(self):
+        return (list(self.stem.parameters()) +
+                list(self.layer1.parameters()) + list(self.layer2.parameters()) +
+                list(self.layer3.parameters()) + list(self.layer4.parameters()))
+
+    def cls_parameters(self):
+        params = list(self.classifier.parameters())
+        if self.classifier2 is not None:
+            params += list(self.classifier2.parameters())
+        return params

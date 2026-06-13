@@ -12,3 +12,10 @@ results/
 .venv/
 *.egg-info/
 dist/
+
+# large data & archives
+data/
+logs/
+*.tgz
+*.zip
+uv.lock

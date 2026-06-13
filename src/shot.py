@@ -1,4 +1,5 @@
 """SHOT adaptation (Liang et al., ICML 2020) with wandb logging."""
+import itertools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -42,14 +43,23 @@ def compute_prototype_pseudo_labels(features, probs, num_classes=200):
     return (feats_n @ prototypes.T).argmax(dim=1)
 
 
-def shot_epoch(model, loader, optimizer, device, lambda_im, lambda_pseudo):
+def shot_epoch(model, loader, optimizer, device, lambda_im, lambda_pseudo,
+               src_loader=None, lambda_src=0.0, criterion=None):
     model.train()
     im_sum = ce_sum = n = 0
+    src_iter = itertools.cycle(src_loader) if (src_loader is not None and lambda_src > 0) else None
+
     for imgs, pseudo_lbls, _ in tqdm(loader, desc="[SHOT]", leave=False):
         imgs, pseudo_lbls = imgs.to(device), pseudo_lbls.to(device)
         optimizer.zero_grad()
-        logits  = model(imgs)
-        loss    = lambda_im * im_loss(logits) + lambda_pseudo * F.cross_entropy(logits, pseudo_lbls)
+        logits = model(imgs)
+        loss   = lambda_im * im_loss(logits) + lambda_pseudo * F.cross_entropy(logits, pseudo_lbls)
+
+        if src_iter is not None:
+            src_imgs, src_lbls = next(src_iter)
+            src_logits = model(src_imgs.to(device))
+            loss = loss + lambda_src * criterion(src_logits, src_lbls.to(device))
+
         loss.backward()
         optimizer.step()
         im_sum += (lambda_im * im_loss(logits.detach())).item()
@@ -59,17 +69,24 @@ def shot_epoch(model, loader, optimizer, device, lambda_im, lambda_pseudo):
 
 
 def run_shot_adaptation(model, tgt_root, tgt_tf, eval_loader, src_eval_loader,
-                         cfg, device, wandb_run=None):
+                         cfg, device, wandb_run=None, src_loader=None,
+                         best_saver=None):
     """
     Returns best_tgt_acc achieved during all SHOT rounds.
     Logs per-epoch metrics to wandb if wandb_run is provided.
+    src_loader: optional source loader for source-replay regularisation.
     """
-    num_classes  = 200
-    shot_rounds  = cfg.get('shot_rounds', 3)
-    shot_epochs  = cfg.get('shot_epochs', 15)
-    lambda_im    = cfg.get('lambda_im', 1.0)
+    num_classes   = 200
+    shot_rounds   = cfg.get('shot_rounds', 3)
+    shot_epochs   = cfg.get('shot_epochs', 15)
+    lambda_im     = cfg.get('lambda_im', 1.0)
     lambda_pseudo = cfg.get('lambda_pseudo', 1.0)
-    global_step  = cfg.get('_global_step', 0)
+    lambda_src    = cfg.get('lambda_src_shot', 0.0)
+    global_step   = cfg.get('_global_step', 0)
+
+    criterion = nn.CrossEntropyLoss() if lambda_src > 0 else None
+    # Only pass src_loader when source replay is enabled
+    _src_loader = src_loader if lambda_src > 0 else None
 
     for p in model.classifier.parameters():
         p.requires_grad_(False)
@@ -97,11 +114,15 @@ def run_shot_adaptation(model, tgt_root, tgt_tf, eval_loader, src_eval_loader,
         sched = build_scheduler(optimizer, cfg, shot_epochs)
 
         for epoch in range(shot_epochs):
-            loss_im, loss_ce = shot_epoch(model, loader, optimizer, device,
-                                           lambda_im, lambda_pseudo)
+            loss_im, loss_ce = shot_epoch(
+                model, loader, optimizer, device,
+                lambda_im, lambda_pseudo,
+                src_loader=_src_loader, lambda_src=lambda_src, criterion=criterion)
             tgt_acc = evaluate(model, eval_loader, device)
             src_acc = evaluate(model, src_eval_loader, device)
             best_tgt = max(best_tgt, tgt_acc)
+            if best_saver is not None:
+                best_saver.update(model, tgt_acc)
             global_step += 1
 
             print(f"  SHOT R{rnd} ep{epoch+1}/{shot_epochs}"

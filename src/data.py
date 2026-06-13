@@ -20,8 +20,16 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-def get_transform(domain: str, augment: bool = False, heavy: bool = False):
+def get_transform(domain: str, augment: bool = False, heavy: bool = False,
+                  grayscale_p: float = 0.0):
+    """
+    grayscale_p: probability of RandomGrayscale applied after other color ops.
+    Use for PtoC target (CUB photos) to bridge the color gap with grayscale paintings.
+    """
     mean, std = (CUB_MEAN, CUB_STD) if domain == 'cub' else (PAINT_MEAN, PAINT_STD)
+
+    def _gray(p):
+        return [transforms.RandomGrayscale(p=p)] if p > 0 else []
 
     if heavy:
         if domain == 'cub':
@@ -31,7 +39,7 @@ def get_transform(domain: str, augment: bool = False, heavy: bool = False):
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomApply(
                     [transforms.GaussianBlur(kernel_size=23, sigma=(0.1, 2.0))], p=0.5),
-                transforms.RandomGrayscale(p=0.5),
+                transforms.RandomGrayscale(p=max(0.5, grayscale_p)),
                 transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.7, hue=0.2),
                 transforms.RandomRotation(20),
                 transforms.ToTensor(),
@@ -44,7 +52,7 @@ def get_transform(domain: str, augment: bool = False, heavy: bool = False):
                 transforms.RandomResizedCrop(224, scale=(0.5, 1.0)),
                 transforms.RandomHorizontalFlip(),
                 transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.8, hue=0.2),
-                transforms.RandomGrayscale(p=0.1),
+                transforms.RandomGrayscale(p=max(0.1, grayscale_p)),
                 transforms.RandomRotation(15),
                 transforms.ToTensor(),
                 transforms.Normalize(mean, std),
@@ -54,12 +62,18 @@ def get_transform(domain: str, augment: bool = False, heavy: bool = False):
             transforms.Resize(224), transforms.CenterCrop(224),
             transforms.RandomHorizontalFlip(),
             transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+            *_gray(grayscale_p),
             transforms.RandomRotation(15),
             transforms.ToTensor(), transforms.Normalize(mean, std),
         ]
     else:
-        ops = [transforms.Resize(224), transforms.CenterCrop(224),
-               transforms.ToTensor(), transforms.Normalize(mean, std)]
+        # Clean eval transform — grayscale_p still applies when explicitly requested
+        # (e.g. PtoC tgt_train_tf; never set for eval_loader)
+        ops = [
+            transforms.Resize(224), transforms.CenterCrop(224),
+            *_gray(grayscale_p),
+            transforms.ToTensor(), transforms.Normalize(mean, std),
+        ]
 
     return transforms.Compose(ops)
 
@@ -86,6 +100,20 @@ class UnlabeledDataset(Dataset):
     def __getitem__(self, idx):
         img, _ = self.dataset[idx]
         return img
+
+
+class TwoViewDataset(Dataset):
+    """Two independently augmented views of each image for SimCLR-style NCE."""
+    def __init__(self, root, transform):
+        self.base = ImageFolder(root=root)   # no transform → PIL
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.base)
+
+    def __getitem__(self, idx):
+        img, _ = self.base[idx]
+        return self.transform(img), self.transform(img)
 
 
 class PseudoLabeledDataset(Dataset):

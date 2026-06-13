@@ -119,5 +119,125 @@
     "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
     "mixup_alpha": 0.2, "label_smoothing": 0.1, "lambda_em": 0.05,
     "shot_lr": 1e-4, "shot_rounds": 5, "shot_epochs": 20
+  },
+  {
+    "name": "light_contrastive",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "use_contrastive_aug": true,
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.1, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "light_balanced",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "use_contrastive_aug": true,
+    "pseudo_select": "balanced", "pseudo_top_k": 15,
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.1, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "light_all",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "use_contrastive_aug": true,
+    "pseudo_select": "balanced", "pseudo_top_k": 15,
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.1, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15,
+    "lambda_src_shot": 0.1
+  },
+  {
+    "name": "source_only",
+    "setting": "CtoP",
+    "mode": "source_only",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80
+  },
+  {
+    "name": "shot_only_light",
+    "setting": "CtoP",
+    "mode": "shot_only",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "dann",
+    "setting": "CtoP",
+    "mode": "dann",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "lambda_dann": 1.0
+  },
+  {
+    "name": "mcd",
+    "setting": "CtoP",
+    "mode": "mcd",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "mcd_k": 4
+  },
+  {
+    "name": "light_nce_fix",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "use_contrastive_aug": true,
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.02,
+    "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "light_strong_shot",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 5e-4, "shot_rounds": 5, "shot_epochs": 20
+  },
+  {
+    "name": "light_two_cls",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "two_classifier": true,
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "pseudo_threshold": 0.7, "pseudo_rounds": 5,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15
+  },
+  {
+    "name": "light_smooth_more",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.05, "label_smoothing": 0.05,
+    "pseudo_threshold": 0.7, "pseudo_rounds": 7,
+    "shot_lr": 5e-4, "shot_rounds": 5, "shot_epochs": 20
+  },
+  {
+    "name": "light_best",
+    "setting": "CtoP",
+    "mode": "joint_pseudo_then_shot",
+    "aug_mode": "light",
+    "use_contrastive_aug": true,
+    "two_classifier": true,
+    "optimizer": "sgd", "lr": 0.01,
+    "lambda_nce": 0.02, "label_smoothing": 0.05,
+    "pseudo_threshold": 0.7, "pseudo_rounds": 7,
+    "shot_lr": 5e-4, "shot_rounds": 5, "shot_epochs": 20
   }
 ]

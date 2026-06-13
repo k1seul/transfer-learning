@@ -1,14 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=uda_ctop
-#SBATCH --partition=gpu          # ← 서버의 파티션 이름으로 변경
+#SBATCH --partition=P2          # ← 서버의 파티션 이름으로 변경
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
-#SBATCH --constraint=rtx3090     # ← GPU 제약조건 (서버에 맞게 수정)
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
-#SBATCH --array=0-12%5           # 13 configs, 최대 5개 동시 실행
+#SBATCH --array=20-24%5          # regularization: light_nce_fix, light_strong_shot, light_two_cls, light_smooth_more, light_best
 #SBATCH --output=logs/ctop_%A_%a.out
 #SBATCH --error=logs/ctop_%A_%a.err
 
@@ -16,7 +15,7 @@
 # 아래 중 하나를 사용 (서버 환경에 맞게 수정)
 
 # Option A: uv venv
-# source .venv/bin/activate
+source .venv/bin/activate
 
 # Option B: conda
 # conda activate uda-search

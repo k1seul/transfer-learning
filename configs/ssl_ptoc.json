@@ -1,0 +1,34 @@
+[
+  {
+    "name": "ssl_ptoc_seed42",
+    "setting": "PtoC",
+    "mode": "ssl_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "ssl_epochs": 100,
+    "ssl_lr": 1e-3,
+    "ssl_optimizer": "adamw",
+    "ssl_weight_decay": 1e-4,
+    "ssl_batch_size": 128,
+    "ssl_temperature": 0.1,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15,
+    "seed": 42
+  },
+  {
+    "name": "ssl_ptoc_seed123",
+    "setting": "PtoC",
+    "mode": "ssl_then_shot",
+    "aug_mode": "light",
+    "optimizer": "sgd", "lr": 0.01,
+    "src_epochs": 80,
+    "ssl_epochs": 100,
+    "ssl_lr": 1e-3,
+    "ssl_optimizer": "adamw",
+    "ssl_weight_decay": 1e-4,
+    "ssl_batch_size": 128,
+    "ssl_temperature": 0.1,
+    "shot_lr": 1e-4, "shot_rounds": 3, "shot_epochs": 15,
+    "seed": 123
+  }
+]
